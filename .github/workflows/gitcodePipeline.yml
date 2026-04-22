@@ -1,59 +1,46 @@
-name: CI/CD Pipeline
+name: CI Pipeline
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
+    branches: [main]
 
 jobs:
-
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Lint Python
-        run: |
-          pip install flake8
-          flake8 .
-
-      - name: Lint JS
-        run: |
-          npm install -g eslint
-          eslint frontend || true
-
   build:
     runs-on: ubuntu-latest
-    needs: lint
+
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - name: Build API
-        run: docker build -t api ./api
+      - name: Install Python deps
+        run: pip install pytest flake8
 
-      - name: Build Worker
-        run: docker build -t worker ./worker
+      - name: Lint Python
+        run: flake8 .
 
-      - name: Build Frontend
-        run: docker build -t frontend ./frontend
+      - name: Run tests
+        run: pytest
 
-  integration-test:
-    runs-on: ubuntu-latest
-    needs: build
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
 
-    steps:
-      - uses: actions/checkout@v3
+      - name: Build Docker image
+        run: docker build -t app:latest .
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: app:latest
 
       - name: Start services
-        run: docker compose up -d --build
+        run: docker-compose up -d
 
-      - name: Wait for services
-        run: sleep 15
-
-      - name: Test API
-        run: curl http://localhost:8000 || true
-
-      - name: Stop services
-        run: docker compose down
+      - name: Tear down
+        if: always()
+        run: docker-compose down

@@ -1,45 +1,51 @@
 version: "3.9"
 
 services:
-
   redis:
     image: redis:7
-    container_name: redis
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+    mem_limit: 256m
+    cpus: 0.5
+    volumes:
+      - redis_data:/data
     networks:
-      - app_net
+      - backend
 
   api:
-    build: ./api
+    build: .
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 0.5
+    networks:
+      - backend
     ports:
       - "8000:8000"
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    depends_on:
-      - redis
-    networks:
-      - app_net
 
   worker:
     build: ./worker
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+    restart: always
+    env_file:
+      - .env
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 0.5
     networks:
-      - app_net
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - API_URL=http://api:8000
-    depends_on:
-      - api
-    networks:
-      - app_net
+      - backend
 
 networks:
-  app_net:
+  backend:
+    driver: bridge
+
+volumes:
+  redis_data:
