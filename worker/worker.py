@@ -1,10 +1,13 @@
 import redis
 import time
 import os
+
+
 redis_host = os.getenv("REDIS_HOST")
 redis_port = os.getenv("REDIS_PORT")
 
-r = redis.Redis(host=redis_host, port=redis_port)
+
+r = redis.Redis(host=redis_host, port=int(redis_port))
 
 
 def process_job(job_id):
@@ -19,4 +22,3 @@ while True:
     if job:
         _, job_id = job
         process_job(job_id.decode())
-        
